@@ -1,0 +1,22 @@
+{
+    "name": "enlivenapp/flight-settings",
+    "description": "Database-backed key-value settings for FlightPHP, ported from CodeIgniter Settings",
+    "type": "flightphp-plugin",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "enlivenapp",
+            "email": "mw@enlivenapp.com"
+        }
+    ],
+    "require": {
+        "php": ">=8.1",
+        "flightphp/core": "^3.0",
+        "enlivenapp/flight-school": "^0.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Enlivenapp\\FlightSettings\\": "src/"
+        }
+    }
+}
