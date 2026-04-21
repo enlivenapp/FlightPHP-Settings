@@ -6,13 +6,8 @@
  * @license   MIT
  */
 
-/**
- * Flight Settings configuration.
- */
+declare(strict_types=1);
 
-$routePrepend = null; // No routes
+$routePrepend = null;
 
-return [
-    // Default values — plugins can register their own via Settings::setDefaults()
-    'defaults' => [],
-];
+return [];

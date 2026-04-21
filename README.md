@@ -1,102 +1,128 @@
 # flight-settings
 
-Database-backed key-value settings for [FlightPHP](https://flightphp.com), built for the [Flight School](https://github.com/enlivenapp/FlightPHP-Flight-School) plugin system. Ported from the CodeIgniter Settings library.
+A settings store for [FlightPHP](https://flightphp.com), built as a [Flight School](https://github.com/enlivenapp/FlightPHP-Flight-School) plugin. Values live in the database, get cached for the request, and keep their PHP types — write an int, read an int back.
 
-Settings are stored in the database and cached in memory for the duration of the request. They support dot-notation keys, optional scoping by context (e.g. per-user or per-site), and automatic type preservation for strings, integers, floats, booleans, arrays, and objects.
+## What you get
+
+- Simple `get()` / `set()` / `forget()` API on `Flight::settings()`.
+- Keys like `'Site.name'` or `'Auth.allowRegistration'`, grouped by the part preceeding the dot.
+- Per-user, per-tenant, or any other scope — pass a `context` string.
+- One query per scope per request. Everything after that comes from memory.
 
 ## Requirements
 
 - PHP 8.1+
 - `flightphp/core` ^3.0
 - `enlivenapp/flight-school` ^0.2
-- Cycle ORM (provided through flight-school's database layer)
+- `enlivenapp/flight-migrations`
+- `flightphp/active-record`
 
-## Installation
+## Install
 
 ```bash
 composer require enlivenapp/flight-settings
 ```
 
-Run migrations to create the `settings` table:
-
-```bash
-php runway cycle:migrate
-```
-
-## Key Format
-
-Keys use dot notation: `'Group.property'`. The part before the dot is the group (maps to the `class` column in the database), the part after is the property (maps to the `key` column). Both parts are required.
+Enable it in `app/config/config.php`:
 
 ```php
-$settings->get('Auth.allowRegistration');  // group: Auth, property: allowRegistration
-$settings->get('Mail.fromAddress');        // group: Mail, property: fromAddress
-```
-
-## Contexts
-
-A context scopes a setting to a specific entity — for example a user ID or a site slug. When you retrieve a contextual setting, the library checks in this order:
-
-1. The contextual value (e.g. this specific user's preference)
-2. The general value (no context — the site-wide default stored in the database)
-3. Config defaults (hardcoded fallbacks from `Config.php` or `setDefaults()`)
-
-```php
-// Store a per-user preference
-$settings->set('User.theme', 'dark', context: (string) $userId);
-
-// Retrieve it — falls back to general, then config defaults
-$theme = $settings->get('User.theme', context: (string) $userId);
-```
-
-If you don't need scoping, just omit the context parameter and settings work as simple key-value pairs.
-
-## How It Works
-
-1. On the first `get()` or `set()` call for a context, the plugin loads all rows for that context from the database in a single query and caches them in memory for the remainder of the request.
-2. Subsequent reads for the same context are served from the in-memory cache — no additional queries.
-3. Values are stored as strings in the database alongside a PHP type name (`boolean`, `integer`, `double`, `array`, `object`, `NULL`). On retrieval they are cast back to their original type automatically.
-4. Arrays and objects are stored via `serialize()` / `unserialize()`.
-
-## Default Values
-
-Defaults are registered through the plugin config and are used as a fallback when no database row exists. They are never written to the database — they just provide a value when nothing else is found.
-
-```php
-// src/Config/Config.php
-return [
-    'defaults' => [
-        'Auth.allowRegistration' => true,
-        'Site.itemsPerPage'      => 20,
+'plugins' => [
+    'enlivenapp/flight-settings' => [
+        'enabled'  => true,
+        'priority' => 20,
     ],
-];
+],
 ```
 
-Plugins can also push their own defaults at runtime via `setDefaults()` in their `Plugin::register()` method. See [Flight School](https://github.com/enlivenapp/FlightPHP-Flight-School) for plugin development.
+That's it. On the next page load, flight-migrations creates the `settings` table and seeds `CMS.siteName` and `CMS.siteByline` as baseline rows.
 
-## Usage
+## Quick start
 
 ```php
 $settings = Flight::settings();
 
-// Get a value (returns null if not found and no default is set)
-$value = $settings->get('Auth.allowRegistration');
+$name = $settings->get('CMS.siteName'); //null
+$name = $settings->get('CMS.siteByline'); //null
 
-// Set a value (creates or updates the setting)
-$settings->set('Auth.allowRegistration', true);
-$settings->set('Auth.siteByline', 'Do Great Things!');
+$settings->set('CMS.siteName', 'My App');
+$settings->set('CMS.siteByline', 'Do Great Things!');
 
-// Check if a setting exists in the database (does not check defaults)
-if ($settings->has('Site.logo')) { ... }
-
-// Delete a setting from the database
-$settings->forget('Site.logo');
-
-// Delete all settings from the database
-$settings->flush();
+$name = $settings->get('CMS.siteName'); // 'My App'
+$name = $settings->get('CMS.siteByline'); // Do Great Things!
 ```
 
-Values can be any type — strings, integers, floats, booleans, arrays, objects, or null. The type is preserved automatically.
+`get()` returns `null` when the key isn't in the database.
+
+## Keys
+
+Dot notation: the part before the dot is the group, the part after is the property. Both are required — a key without a dot throws `InvalidArgumentException`.
+
+```php
+$settings->get('Auth.allowRegistration'); // group = Auth, property = allowRegistration
+$settings->get('Mail.fromAddress');
+```
+
+## Contexts
+
+A context lets the same setting hold different values for different things. You pick any string that identifies what the setting belongs to, and pass it as the `context` argument. Examples of what a context could be:
+
+- A user ID → this setting belongs to user `42`
+- A site code (if one app serves multiple sites) → this setting is for site `westcoast`
+- A customer or organization ID → this setting belongs to `ACME Corp`
+- A language code → this setting is for the Spanish version
+
+Every row in the `settings` table has an optional `context` column. Writing with a context ties the row to that string; reading with the same string returns that row. Reading with no context returns the general (site-wide) row.
+
+```php
+$settings->set('User.theme', 'dark', context: (string) $userId);
+$settings->get('User.theme', context: (string) $userId);
+$settings->forget('User.theme', context: (string) $userId);
+```
+
+`get()` with a context returns only that context's row, or `null` if there isn't one.
+
+## Types
+
+A database column doesn't remember PHP types. Save `true` and you usually read back `"1"`. Save `20` and you read back `"20"`. This plugin records the type next to the value so the cast is done for you on read — what you put in is what you get back.
+
+```php
+$settings->set('Site.itemsPerPage', 20);
+$settings->get('Site.itemsPerPage'); // 20 — integer, not "20"
+
+$settings->set('Auth.allowRegistration', true);
+$settings->get('Auth.allowRegistration'); // true — boolean, not "1"
+```
+
+Supported: `string`, `integer`, `double` (float), `boolean`, `array`, `object`, `NULL`. Arrays and objects are stored via PHP's `serialize()` and restored with `unserialize()` — so you can stash small structured values, just don't treat it like a document store.
+
+## API
+
+All methods on `Flight::settings()`:
+
+| Method | Signature | What it does |
+|---|---|---|
+| `get` | `get(string $key, ?string $context = null): mixed` | Read. Returns `null` if not in the database. |
+| `set` | `set(string $key, mixed $value = null, ?string $context = null): void` | Write. Cache updates immediately. |
+| `has` | `has(string $key, ?string $context = null): bool` | Does a database row exist? |
+| `forget` | `forget(string $key, ?string $context = null): void` | Delete one row. |
+
+## Schema
+
+The migration creates a `settings` table:
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | int | Primary key |
+| `class` | varchar(255) | Part before the dot |
+| `key` | varchar(255) | Part after the dot |
+| `value` | text, nullable | Serialized value |
+| `type` | varchar(31) | PHP type, used for cast-back |
+| `context` | varchar(255), nullable | Scope string; `NULL` = general |
+| `created_at` | datetime, nullable | |
+| `updated_at` | datetime, nullable | |
+
+Composite index on `(class, key, context)`.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

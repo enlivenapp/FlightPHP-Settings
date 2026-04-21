@@ -10,10 +10,8 @@ declare(strict_types=1);
 
 namespace Enlivenapp\FlightSettings;
 
-use Cycle\ORM\EntityManager;
-use Cycle\ORM\ORMInterface;
 use Enlivenapp\FlightSettings\Entities\Setting;
-use Enlivenapp\FlightSettings\Repositories\SettingRepository;
+use flight\database\SimplePdo;
 
 /**
  * Database-backed settings with in-memory cache.
@@ -22,12 +20,11 @@ use Enlivenapp\FlightSettings\Repositories\SettingRepository;
  * The part before the dot is the "class" (group), the part after is the "key" (property).
  *
  * Supports contexts for scoped values (e.g., per-user or per-site settings).
- * Falls back from context → general → config defaults.
+ * A read with a context returns only that context's row; no fallback to the general row.
  */
 class Settings
 {
-    protected ORMInterface $orm;
-    protected array $defaults;
+    protected SimplePdo $pdo;
 
     /** @var array In-memory cache: [context][class][key] => [value, type] */
     protected array $cache = [];
@@ -35,10 +32,9 @@ class Settings
     /** @var array Tracks which contexts have been hydrated from DB */
     protected array $hydrated = [];
 
-    public function __construct(ORMInterface $orm, array $defaults = [])
+    public function __construct(SimplePdo $pdo)
     {
-        $this->orm = $orm;
-        $this->defaults = $defaults;
+        $this->pdo = $pdo;
     }
 
     /**
@@ -46,32 +42,18 @@ class Settings
      *
      * @param string      $key     Dot-notation key: 'Group.property'
      * @param string|null $context Optional context for scoped values
-     * @return mixed
      */
     public function get(string $key, ?string $context = null): mixed
     {
         [$class, $property] = $this->parseKey($key);
 
-        // Try contextual first
         if ($context !== null) {
             $this->hydrate($context);
-
-            if (isset($this->cache[$context][$class][$property])) {
-                return $this->cache[$context][$class][$property][0];
-            }
-
-            // Fall through to general
+            return $this->cache[$context][$class][$property][0] ?? null;
         }
 
-        // Try general (null context)
         $this->hydrate(null);
-
-        if (isset($this->cache['_general'][$class][$property])) {
-            return $this->cache['_general'][$class][$property][0];
-        }
-
-        // Fall back to config defaults
-        return $this->defaults[$key] ?? $this->defaults[$class . '.' . $property] ?? null;
+        return $this->cache['_general'][$class][$property][0] ?? null;
     }
 
     /**
@@ -81,31 +63,26 @@ class Settings
     {
         [$class, $property] = $this->parseKey($key);
 
-        $repo = $this->getRepository();
-        $existing = $repo->findSetting($class, $property, $context);
-
-        $now = new \DateTimeImmutable();
+        $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
         [$preparedValue, $type] = $this->prepareValue($value);
+
+        $existing = $this->setting()->findOneBy($class, $property, $context);
 
         if ($existing !== null) {
             $existing->value = $preparedValue;
             $existing->type = $type;
             $existing->updated_at = $now;
-
-            $em = new EntityManager($this->orm);
-            $em->persist($existing)->run();
+            $existing->save();
         } else {
-            $setting = new Setting();
-            $setting->class = $class;
-            $setting->key = $property;
-            $setting->value = $preparedValue;
-            $setting->type = $type;
-            $setting->context = $context;
-            $setting->created_at = $now;
-            $setting->updated_at = $now;
-
-            $em = new EntityManager($this->orm);
-            $em->persist($setting)->run();
+            $new = $this->setting();
+            $new->class = $class;
+            $new->key = $property;
+            $new->value = $preparedValue;
+            $new->type = $type;
+            $new->context = $context;
+            $new->created_at = $now;
+            $new->updated_at = $now;
+            $new->insert();
         }
 
         // Update cache
@@ -120,12 +97,10 @@ class Settings
     {
         [$class, $property] = $this->parseKey($key);
 
-        $repo = $this->getRepository();
-        $existing = $repo->findSetting($class, $property, $context);
+        $existing = $this->setting()->findOneBy($class, $property, $context);
 
         if ($existing !== null) {
-            $em = new EntityManager($this->orm);
-            $em->delete($existing)->run();
+            $existing->delete();
         }
 
         // Remove from cache
@@ -147,38 +122,13 @@ class Settings
         return isset($this->cache[$cacheKey][$class][$property]);
     }
 
-    /**
-     * Flush all settings from the database.
-     */
-    public function flush(): void
-    {
-        $all = $this->getRepository()->select()->fetchAll();
-
-        $em = new EntityManager($this->orm);
-        foreach ($all as $setting) {
-            $em->delete($setting);
-        }
-        $em->run();
-
-        $this->cache = [];
-        $this->hydrated = [];
-    }
-
-    /**
-     * Set config defaults (from plugin Config.php arrays, etc.).
-     */
-    public function setDefaults(array $defaults): void
-    {
-        $this->defaults = array_merge($this->defaults, $defaults);
-    }
-
     // -----------------------------------------------------------------
     // Internal
     // -----------------------------------------------------------------
 
     /**
      * Hydrate cache from database for the given context.
-     * Loads both general and contextual records in one query.
+     * Loads both general and contextual records in one query when context is non-null.
      */
     protected function hydrate(?string $context): void
     {
@@ -188,21 +138,17 @@ class Settings
             return;
         }
 
-        $repo = $this->getRepository();
-
         if ($context !== null) {
             // Also hydrate general if not done yet
             $this->hydrate(null);
-
-            $records = $repo->findAllByContext($context);
-        } else {
-            $records = $repo->findAllByContext(null);
         }
 
-        foreach ($records as $setting) {
-            $recordContext = $setting->context ?? '_general';
-            $value = $this->parseValue($setting->value, $setting->type);
-            $this->cache[$recordContext][$setting->class][$setting->key] = [$value, $setting->type];
+        $records = $this->setting()->findByContext($context);
+
+        foreach ($records as $row) {
+            $recordContext = $row->context ?? '_general';
+            $value = $this->parseValue($row->value, $row->type);
+            $this->cache[$recordContext][$row->class][$row->key] = [$value, $row->type];
         }
 
         $this->hydrated[] = $cacheKey;
@@ -277,8 +223,11 @@ class Settings
         return $value;
     }
 
-    protected function getRepository(): SettingRepository
+    /**
+     * Fresh Setting AR instance — avoids query-state bleed between calls.
+     */
+    private function setting(): Setting
     {
-        return $this->orm->getRepository(Setting::class);
+        return new Setting($this->pdo);
     }
 }

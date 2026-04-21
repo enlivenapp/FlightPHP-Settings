@@ -12,7 +12,9 @@
     "require": {
         "php": ">=8.1",
         "flightphp/core": "^3.0",
-        "enlivenapp/flight-school": "^0.2"
+        "enlivenapp/flight-school": "^0.2",
+        "flightphp/active-record": "*",
+        "enlivenapp/flight-migrations": "*"
     },
     "autoload": {
         "psr-4": {
