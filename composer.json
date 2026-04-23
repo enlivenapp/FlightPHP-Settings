@@ -14,7 +14,7 @@
         "flightphp/core": "^3.0",
         "enlivenapp/flight-school": "^0.2",
         "flightphp/active-record": "*",
-        "enlivenapp/flight-migrations": "*"
+        "enlivenapp/migrations": "*"
     },
     "autoload": {
         "psr-4": {

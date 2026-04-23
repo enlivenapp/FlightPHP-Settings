@@ -1,3 +1,9 @@
+[![Version](http://poser.pugx.org/enlivenapp/flight-settings/version)](https://packagist.org/packages/enlivenapp/flight-settings)
+[![License](http://poser.pugx.org/enlivenapp/flight-settings/license)](https://packagist.org/packages/enlivenapp/flight-settings)
+[![Suggesters](http://poser.pugx.org/enlivenapp/flight-settings/suggesters)](https://packagist.org/packages/enlivenapp/flight-settings)
+[![PHP Version Require](http://poser.pugx.org/enlivenapp/flight-settings/require/php)](https://packagist.org/packages/enlivenapp/flight-settings)
+[![Monthly Downloads](https://poser.pugx.org/enlivenapp/flight-settings/d/monthly)](https://packagist.org/packages/enlivenapp/flight-settings)
+
 # flight-settings
 
 A settings store for [FlightPHP](https://flightphp.com), built as a [Flight School](https://github.com/enlivenapp/FlightPHP-Flight-School) plugin. Values live in the database, get cached for the request, and keep their PHP types — write an int, read an int back.
@@ -14,7 +20,7 @@ A settings store for [FlightPHP](https://flightphp.com), built as a [Flight Scho
 - PHP 8.1+
 - `flightphp/core` ^3.0
 - `enlivenapp/flight-school` ^0.2
-- `enlivenapp/flight-migrations`
+- `enlivenapp/migrations`
 - `flightphp/active-record`
 
 ## Install
@@ -34,7 +40,7 @@ Enable it in `app/config/config.php`:
 ],
 ```
 
-That's it. On the next page load, flight-migrations creates the `settings` table and seeds `CMS.siteName` and `CMS.siteByline` as baseline rows.
+That's it. On the next page load, enlivenapp/migrations creates the `settings` table and seeds `CMS.siteName` and `CMS.siteByline` as baseline rows.
 
 ## Quick start
 

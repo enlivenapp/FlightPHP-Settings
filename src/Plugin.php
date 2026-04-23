@@ -17,19 +17,8 @@ use Flight;
 
 class Plugin implements PluginInterface
 {
-    public array $seeds = [
-        'install' => [
-            [
-                'table' => 'settings',
-                'rows'  => [
-                    ['class' => 'CMS', 'key' => 'siteName',   'value' => '', 'type' => 'string'],
-                    ['class' => 'CMS', 'key' => 'siteByline', 'value' => '', 'type' => 'string'],
-                ],
-            ],
-        ],
-    ];
-
-    public function register(Engine $app, Router $router, array $config = []): void
+ 
+     public function register(Engine $app, Router $router, array $config = []): void
     {
         // Map the settings service (singleton via static $instance)
         $app->map('settings', function () {

@@ -10,7 +10,7 @@ declare(strict_types=1);
 
 namespace Enlivenapp\FlightSettings\Database\Migrations;
 
-use Enlivenapp\FlightMigrations\Services\Migration;
+use Enlivenapp\Migrations\Services\Migration;
 
 class CreateSettingsTable extends Migration
 {
