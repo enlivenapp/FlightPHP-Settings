@@ -8,10 +8,10 @@
 
 declare(strict_types=1);
 
-namespace Enlivenapp\FlightSettings\Entities;
+namespace Enlivenapp\FlightSettings\Models;
 
 /**
- * Setting ActiveRecord entity.
+ * Setting ActiveRecord model.
  *
  * Represents a single row in the `settings` table.
  */

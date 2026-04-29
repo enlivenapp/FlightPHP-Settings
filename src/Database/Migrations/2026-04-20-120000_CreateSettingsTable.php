@@ -22,6 +22,8 @@ class CreateSettingsTable extends Migration
             ->addColumn('key', 'string', ['length' => 255])
             ->addColumn('value', 'text', ['nullable' => true])
             ->addColumn('type', 'string', ['length' => 31, 'default' => 'string'])
+            ->addColumn('title', 'string', ['length' => 30, 'nullable' => true])
+            ->addColumn('description', 'string', ['length' => 255, 'nullable' => true])
             ->addColumn('context', 'string', ['length' => 255, 'nullable' => true])
             ->addColumn('created_at', 'datetime', ['nullable' => true])
             ->addColumn('updated_at', 'datetime', ['nullable' => true])

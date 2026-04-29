@@ -8,10 +8,11 @@
 
 declare(strict_types=1);
 
-namespace Enlivenapp\FlightSettings;
+namespace Enlivenapp\FlightSettings\Services;
 
-use Enlivenapp\FlightSettings\Entities\Setting;
-use flight\database\SimplePdo;
+use Enlivenapp\FlightSettings\Models\Setting;
+use flight\database\PdoWrapper;
+use Flight;
 
 /**
  * Database-backed settings with in-memory cache.
@@ -21,10 +22,13 @@ use flight\database\SimplePdo;
  *
  * Supports contexts for scoped values (e.g., per-user or per-site settings).
  * A read with a context returns only that context's row; no fallback to the general row.
+ *
+ * On construction, hydrates general-context settings and pushes them into
+ * Flight::set() so they are available globally via Flight::get('Class.key').
  */
 class Settings
 {
-    protected SimplePdo $pdo;
+    protected PdoWrapper $pdo;
 
     /** @var array In-memory cache: [context][class][key] => [value, type] */
     protected array $cache = [];
@@ -32,9 +36,10 @@ class Settings
     /** @var array Tracks which contexts have been hydrated from DB */
     protected array $hydrated = [];
 
-    public function __construct(SimplePdo $pdo)
+    public function __construct(PdoWrapper $pdo)
     {
         $this->pdo = $pdo;
+        $this->hydrate(null);
     }
 
     /**
@@ -91,6 +96,41 @@ class Settings
     }
 
     /**
+     * Save all key/value pairs for a class at once.
+     *
+     * @param string      $class   Class name (e.g. 'CMS')
+     * @param array       $data    key => value pairs to save
+     * @param string|null $context Optional context
+     */
+    public function saveClass(string $class, array $data, ?string $context = null): void
+    {
+        $existing = $this->getClass($class, $context);
+
+        foreach ($data as $key => $value) {
+            if (isset($existing[$key])) {
+                $value = $this->castToType($value, $existing[$key]['type']);
+            }
+            $this->set("{$class}.{$key}", $value, $context);
+        }
+    }
+
+    /**
+     * Cast a value to the given type.
+     *
+     * @param mixed  $value Raw value (typically a string from POST)
+     * @param string $type  Target type (string, integer, double, boolean)
+     */
+    protected function castToType(mixed $value, string $type): mixed
+    {
+        return match ($type) {
+            'boolean' => (bool) $value,
+            'integer' => (int) $value,
+            'double'  => (float) $value,
+            default   => (string) $value,
+        };
+    }
+
+    /**
      * Remove a setting from the database.
      */
     public function forget(string $key, ?string $context = null): void
@@ -122,6 +162,70 @@ class Settings
         return isset($this->cache[$cacheKey][$class][$property]);
     }
 
+    /**
+     * Get all distinct class names.
+     *
+     * @param string|null $context Optional context
+     * @return string[] Sorted class names
+     */
+    public function getClasses(?string $context = null): array
+    {
+        $this->hydrate($context);
+        $cacheKey = $context ?? '_general';
+        $classes = array_keys($this->cache[$cacheKey] ?? []);
+        sort($classes);
+        return $classes;
+    }
+
+    /**
+     * Get all settings grouped by class.
+     *
+     * @param string|null $context Optional context
+     * @return array<string, array<string, mixed>> class => [key => value]
+     */
+    public function getAll(?string $context = null): array
+    {
+        $this->hydrate($context);
+        $cacheKey = $context ?? '_general';
+        $entries = $this->cache[$cacheKey] ?? [];
+
+        $result = [];
+        foreach ($entries as $class => $keys) {
+            foreach ($keys as $key => $pair) {
+                $result[$class][$key] = $pair[0];
+            }
+        }
+
+        ksort($result);
+        return $result;
+    }
+
+    /**
+     * Get all key/value/type entries for a given class.
+     *
+     * @param string      $class   Class name (e.g. 'CMS')
+     * @param string|null $context Optional context
+     * @return array<string, array{value: mixed, type: string}> key => [value, type]
+     */
+    public function getClass(string $class, ?string $context = null): array
+    {
+        $this->hydrate($context);
+        $cacheKey = $context ?? '_general';
+        $entries = $this->cache[$cacheKey][$class] ?? [];
+
+        $result = [];
+        foreach ($entries as $key => $pair) {
+            $result[$key] = [
+                'value'       => $pair[0],
+                'type'        => $pair[1],
+                'title'       => $pair[2] ?? null,
+                'description' => $pair[3] ?? null,
+            ];
+        }
+
+        return $result;
+    }
+
     // -----------------------------------------------------------------
     // Internal
     // -----------------------------------------------------------------
@@ -129,6 +233,7 @@ class Settings
     /**
      * Hydrate cache from database for the given context.
      * Loads both general and contextual records in one query when context is non-null.
+     * When hydrating general context, also pushes values into Flight::set().
      */
     protected function hydrate(?string $context): void
     {
@@ -148,7 +253,17 @@ class Settings
         foreach ($records as $row) {
             $recordContext = $row->context ?? '_general';
             $value = $this->parseValue($row->value, $row->type);
-            $this->cache[$recordContext][$row->class][$row->key] = [$value, $row->type];
+            $this->cache[$recordContext][$row->class][$row->key] = [
+                $value,
+                $row->type,
+                $row->title ?? null,
+                $row->description ?? null,
+            ];
+
+            // Push general-context settings into Flight::set()
+            if ($recordContext === '_general') {
+                Flight::set("{$row->class}.{$row->key}", $value);
+            }
         }
 
         $this->hydrated[] = $cacheKey;
