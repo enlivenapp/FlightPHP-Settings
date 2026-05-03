@@ -205,7 +205,7 @@ class Settings
      *
      * @param string      $class   Class name (e.g. 'CMS')
      * @param string|null $context Optional context
-     * @return array<string, array{value: mixed, type: string}> key => [value, type]
+     * @return array<string, array{value: mixed, type: string, title: ?string, description: ?string}>
      */
     public function getClass(string $class, ?string $context = null): array
     {

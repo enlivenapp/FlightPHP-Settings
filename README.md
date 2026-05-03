@@ -1,10 +1,16 @@
-[![Version](http://poser.pugx.org/enlivenapp/flight-settings/version)](https://packagist.org/packages/enlivenapp/flight-settings)
-[![License](http://poser.pugx.org/enlivenapp/flight-settings/license)](https://packagist.org/packages/enlivenapp/flight-settings)
-[![Suggesters](http://poser.pugx.org/enlivenapp/flight-settings/suggesters)](https://packagist.org/packages/enlivenapp/flight-settings)
-[![PHP Version Require](http://poser.pugx.org/enlivenapp/flight-settings/require/php)](https://packagist.org/packages/enlivenapp/flight-settings)
-[![Monthly Downloads](https://poser.pugx.org/enlivenapp/flight-settings/d/monthly)](https://packagist.org/packages/enlivenapp/flight-settings)
+[![Stable? Not Quite Yet](https://img.shields.io/badge/stable%3F-not%20quite%20yet-blue?style=for-the-badge)](https://packagist.org/packages/enlivenapp/flight-settings)
+[![License](https://img.shields.io/packagist/l/enlivenapp/flight-settings?style=for-the-badge)](https://packagist.org/packages/enlivenapp/flight-settings)
+[![PHP Version](https://img.shields.io/packagist/php-v/enlivenapp/flight-settings?style=for-the-badge)](https://packagist.org/packages/enlivenapp/flight-settings)
+[![Monthly Downloads](https://img.shields.io/packagist/dm/enlivenapp/flight-settings?style=for-the-badge)](https://packagist.org/packages/enlivenapp/flight-settings)
+[![Total Downloads](https://img.shields.io/packagist/dt/enlivenapp/flight-settings?style=for-the-badge)](https://packagist.org/packages/enlivenapp/flight-settings)
+[![GitHub Issues](https://img.shields.io/github/issues/enlivenapp/FlightPHP-Settings?style=for-the-badge)](https://github.com/enlivenapp/FlightPHP-Settings/issues)
+[![Contributors](https://img.shields.io/github/contributors/enlivenapp/FlightPHP-Settings?style=for-the-badge)](https://github.com/enlivenapp/FlightPHP-Settings/graphs/contributors)
+[![Latest Release](https://img.shields.io/github/v/release/enlivenapp/FlightPHP-Settings?style=for-the-badge)](https://github.com/enlivenapp/FlightPHP-Settings/releases)
+[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-blue?style=for-the-badge)](https://github.com/enlivenapp/FlightPHP-Settings/pulls)
 
 # flight-settings
+
+**I noticed folks downloading some of these packages. I'm super grateful, Thank You!  I would like to let folks know until this notice disappears I'm doing a lot of breaking changes without worrying about them.  Once versions are up around 0.5.x things should settle down.**
 
 A settings store for [FlightPHP](https://flightphp.com), built as a [Flight School](https://github.com/enlivenapp/FlightPHP-Flight-School) plugin. Values live in the database, get cached for the request, and keep their PHP types — write an int, read an int back.
 
@@ -41,6 +47,8 @@ Enable it in `app/config/config.php`:
 ```
 
 That's it. On the next page load, enlivenapp/migrations creates the `settings` table and seeds `CMS.siteName` and `CMS.siteByline` as baseline rows.
+
+Flight School reads this package's `src/Config/Config.php` as a returned array and stores it on `$app` under `enlivenapp.flight-settings`. That file currently returns `'routePrepend' => null`, so the package does not register a public route prefix.
 
 ## Quick start
 

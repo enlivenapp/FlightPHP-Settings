@@ -7,6 +7,7 @@ return [
             'rows'  => [
                 ['class' => 'CMS', 'key' => 'siteName',   'value' => 'Pubvana', 'type' => 'string', 'title' => 'Site Name', 'description' => 'Enter the name of your site'],
                 ['class' => 'CMS', 'key' => 'siteByline', 'value' => 'Publishing Nirvana', 'type' => 'string', 'title' => 'Site Byline', 'description' => 'Enter the slogan of your website'],
+                ['class' => 'FrontPage', 'key' => 'route', 'value' => '/blog', 'type' => 'string', 'title' => 'Front Page Route', 'description' => 'Choose to show the homepage'],
             ],
         ],
         [

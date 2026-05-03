@@ -8,6 +8,6 @@
 
 declare(strict_types=1);
 
-$routePrepend = null;
-
-return [];
+return [
+    'routePrepend' => null,
+];
